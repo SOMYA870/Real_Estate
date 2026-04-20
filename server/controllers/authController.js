@@ -6,6 +6,17 @@ exports.register = async (req, res) => {
   try {
     const { role, name, phone, email, password, clientType, joiningDate } = req.body;
     
+    // Strict Domain and Numeric Phone Check Restrictions
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|mail\.com|yahoo\.com)$/i;
+    if (email && !emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Email must be a @gmail.com, @mail.com, or @yahoo.com domain' });
+    }
+    
+    const phoneRegex = /^\d+$/;
+    if (phone && !phoneRegex.test(phone)) {
+      return res.status(400).json({ error: 'Phone must contain only numbers' });
+    }
+
     if (!['admin', 'agent', 'client', 'owner'].includes(role)) {
       return res.status(400).json({ error: 'Invalid role' });
     }
@@ -57,37 +68,37 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { identifier, password } = req.body; 
+    const { identifier, password, expectedRole } = req.body; 
 
     let user;
     let authHash;
     let assignedRole;
 
-    const [adminRows] = await db.query('SELECT admin_id as id, name, email, password FROM Admin WHERE email = ?', [identifier]);
-    if (adminRows.length > 0) {
-      user = adminRows[0];
-      authHash = user.password;
-      assignedRole = 'admin';
-    } else {
-      const [agentRows] = await db.query('SELECT agent_id as id, name, email, password FROM Agent WHERE email = ?', [identifier]);
+    if (!expectedRole || expectedRole === 'admin') {
+      const [adminRows] = await db.query('SELECT admin_id as id, name, email, password FROM Admin WHERE email = ?', [identifier]);
+      if (adminRows.length > 0) {
+        user = adminRows[0]; authHash = user.password; assignedRole = 'admin';
+      }
+    }
+    
+    if (!user && (!expectedRole || expectedRole === 'agent')) {
+      const [agentRows] = await db.query('SELECT agent_id as id, name, email, password FROM Agent WHERE email = ? OR phone = ?', [identifier, identifier]);
       if (agentRows.length > 0) {
-        user = agentRows[0];
-        authHash = user.password;
-        assignedRole = 'agent';
-      } else {
-        const [clientRows] = await db.query('SELECT client_id as id, name, phone, email, type, password FROM Client WHERE phone = ? OR email = ?', [identifier, identifier]);
-        if (clientRows.length > 0) {
-          user = clientRows[0];
-          authHash = user.password;
-          assignedRole = 'client';
-        } else {
-          const [ownerRows] = await db.query('SELECT owner_id as id, name, phone, email, password FROM Owner WHERE phone = ? OR email = ?', [identifier, identifier]);
-          if (ownerRows.length > 0) {
-            user = ownerRows[0];
-            authHash = user.password;
-            assignedRole = 'owner';
-          }
-        }
+        user = agentRows[0]; authHash = user.password; assignedRole = 'agent';
+      }
+    }
+    
+    if (!user && (!expectedRole || expectedRole === 'client')) {
+      const [clientRows] = await db.query('SELECT client_id as id, name, phone, email, type, password FROM Client WHERE phone = ? OR email = ?', [identifier, identifier]);
+      if (clientRows.length > 0) {
+        user = clientRows[0]; authHash = user.password; assignedRole = 'client';
+      }
+    }
+    
+    if (!user && (!expectedRole || expectedRole === 'owner')) {
+      const [ownerRows] = await db.query('SELECT owner_id as id, name, phone, email, password FROM Owner WHERE phone = ? OR email = ?', [identifier, identifier]);
+      if (ownerRows.length > 0) {
+        user = ownerRows[0]; authHash = user.password; assignedRole = 'owner';
       }
     }
 
@@ -126,14 +137,18 @@ exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
     const role = req.user.role;
-    const { name, phone, email } = req.body;
+    const { name, phone, email, type } = req.body;
 
     if (role === 'admin') {
        await db.query('UPDATE Admin SET name = ?, email = ? WHERE admin_id = ?', [name, email, userId]);
     } else if (role === 'agent') {
        await db.query('UPDATE Agent SET name = ?, phone = ?, email = ? WHERE agent_id = ?', [name, phone, email, userId]);
     } else if (role === 'client') {
-       await db.query('UPDATE Client SET name = ?, phone = ?, email = ? WHERE client_id = ?', [name, phone, email, userId]);
+       if (type) {
+           await db.query('UPDATE Client SET name = ?, phone = ?, email = ?, type = ? WHERE client_id = ?', [name, phone, email, type, userId]);
+       } else {
+           await db.query('UPDATE Client SET name = ?, phone = ?, email = ? WHERE client_id = ?', [name, phone, email, userId]);
+       }
     } else if (role === 'owner') {
        await db.query('UPDATE Owner SET name = ?, phone = ?, email = ? WHERE owner_id = ?', [name, phone, email, userId]);
     }

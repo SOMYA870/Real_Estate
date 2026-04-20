@@ -72,11 +72,13 @@ CREATE TABLE Property (
     rent_price           FLOAT       DEFAULT NULL CHECK (rent_price >= 0),
     status               VARCHAR(50) NOT NULL DEFAULT 'available',
     owner_id             INT         NOT NULL,
+    agent_id             INT         DEFAULT NULL,
     listed_on            DATE        NOT NULL,
     CONSTRAINT chk_property_status CHECK (status IN ('available', 'sold', 'rent')),
     FOREIGN KEY (city_id)  REFERENCES City(city_id) ON DELETE RESTRICT,
     FOREIGN KEY (type_id)  REFERENCES PropertyType(type_id) ON DELETE RESTRICT,
-    FOREIGN KEY (owner_id) REFERENCES Owner(owner_id) ON DELETE CASCADE
+    FOREIGN KEY (owner_id) REFERENCES Owner(owner_id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES Agent(agent_id) ON DELETE SET NULL
 );
 
 
@@ -98,6 +100,21 @@ CREATE TABLE Sale (
     FOREIGN KEY (property_id) REFERENCES Property(property_id) ON DELETE CASCADE,
     FOREIGN KEY (buyer_id)    REFERENCES Client(client_id) ON DELETE CASCADE,
     FOREIGN KEY (agent_id)    REFERENCES Agent(agent_id) ON DELETE CASCADE
+);
+
+
+CREATE TABLE Inquiry (
+    inquiry_id INT AUTO_INCREMENT PRIMARY KEY,
+    property_id INT NOT NULL,
+    client_id INT NOT NULL,
+    agent_id INT NOT NULL,
+    status ENUM('pending', 'accepted', 'rejected') DEFAULT 'pending',
+    intent ENUM('buy', 'rent') DEFAULT 'buy',
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (property_id) REFERENCES Property(property_id) ON DELETE CASCADE,
+    FOREIGN KEY (client_id) REFERENCES Client(client_id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES Agent(agent_id) ON DELETE CASCADE
 );
 
 
@@ -178,7 +195,7 @@ CREATE INDEX idx_review_client     ON Review(client_id);
 
 -- DATA INSERTS
 
-INSERT INTO City (city_name) VALUES ('Delhi'), ('Mumbai'), ('Pune');
+INSERT INTO City (city_name) VALUES ('Delhi'), ('Mumbai'), ('Pune'), ('Patna'), ('Guwahati');
 
 INSERT INTO PropertyType (type_name) VALUES ('Flat'), ('House');
 
@@ -279,44 +296,62 @@ INSERT INTO Property VALUES
 (2,2,2,2000,4,3,2018,8000000,30000,'sold',1,'2023-02-01'),
 (3,3,1,1000,2,2,2017,4000000,15000,'rent',2,'2023-03-01'),
 (4,1,1,900,2,1,2016,3500000,12000,'available',2,'2023-01-10'),
-(5,2,1,1100,3,2,2019,6000000,22000,'sold',3,'2023-02-10'),
-(6,3,2,1800,4,3,2014,7000000,25000,'rent',3,'2023-03-10'),
+(5,4,1,1100,3,2,2019,6000000,22000,'sold',3,'2023-02-10'),
+(6,5,2,1800,4,3,2014,7000000,25000,'rent',3,'2023-03-10'),
 (7,1,1,800,2,1,2013,3000000,10000,'available',4,'2023-01-15'),
 (8,2,2,2200,5,4,2020,9000000,35000,'sold',4,'2023-02-15'),
 (9,3,1,950,2,2,2018,4200000,16000,'rent',5,'2023-03-15'),
-(10,1,1,1300,3,2,2016,5200000,21000,'available',1,'2023-01-20'),
-(11,2,1,1400,3,2,2017,5800000,23000,'sold',2,'2023-02-20'),
+(10,4,1,1300,3,2,2016,5200000,21000,'available',1,'2023-01-20'),
+(11,5,1,1400,3,2,2017,5800000,23000,'sold',2,'2023-02-20'),
 (12,3,2,2000,4,3,2015,7500000,26000,'rent',3,'2023-03-20'),
 (13,1,1,1000,2,2,2019,4500000,17000,'available',4,'2023-01-25'),
 (14,2,2,2100,4,3,2018,8200000,31000,'sold',5,'2023-02-25'),
 (15,3,1,900,2,1,2017,3800000,14000,'rent',1,'2023-03-25'),
-(16,1,1,1250,3,2,2016,5100000,20000,'available',2,'2023-01-28'),
-(17,2,1,1350,3,2,2017,5700000,22000,'sold',3,'2023-02-28'),
+(16,4,1,1250,3,2,2016,5100000,20000,'available',2,'2023-01-28'),
+(17,5,1,1350,3,2,2017,5700000,22000,'sold',3,'2023-02-28'),
 (18,3,2,1900,4,3,2015,7200000,25000,'rent',4,'2023-03-28'),
 (19,1,1,950,2,2,2018,4300000,16000,'available',5,'2023-01-30'),
 (20,2,2,2300,5,4,2020,9500000,36000,'sold',1,'2023-02-28'),
 (21,3,1,1050,2,2,2017,4100000,15000,'rent',2,'2023-03-30'),
-(22,1,1,1150,3,2,2016,4900000,19000,'available',3,'2023-01-12'),
-(23,2,1,1250,3,2,2018,5600000,21000,'sold',4,'2023-02-12'),
+(22,4,1,1150,3,2,2016,4900000,19000,'available',3,'2023-01-12'),
+(23,5,1,1250,3,2,2018,5600000,21000,'sold',4,'2023-02-12'),
 (24,3,2,1750,4,3,2014,6900000,24000,'rent',5,'2023-03-12'),
 (25,1,1,850,2,1,2013,3100000,11000,'available',1,'2023-01-18'),
 (26,2,2,2400,5,4,2021,9700000,37000,'sold',2,'2023-02-18'),
 (27,3,1,980,2,2,2019,4400000,17000,'rent',3,'2023-03-18'),
-(28,1,1,1200,3,2,2015,5000000,20000,'available',4,'2023-01-22'),
-(29,2,1,1300,3,2,2017,5800000,23000,'sold',5,'2023-02-22'),
+(28,4,1,1200,3,2,2015,5000000,20000,'available',4,'2023-01-22'),
+(29,5,1,1300,3,2,2017,5800000,23000,'sold',5,'2023-02-22'),
 (30,3,2,1850,4,3,2016,7100000,25000,'rent',1,'2023-03-22');
 
 INSERT INTO Amenity (amenity_id, amenity_name) VALUES
-(1,'Parking'),
-(2,'Gym'),
-(3,'Lift'),
-(4,'Pool'),
-(5,'Garden');
+(1,'Private Gallery'),
+(2,'Wine Vault'),
+(3,'Parking'),
+(4,'Infinity Pool'),
+(5,'Smart Home System'),
+(6,'Home Cinema'),
+(7,'Elevator'),
+(8,'Spa & Sauna'),
+(9,'Gym');
 
 INSERT INTO Property_Amenity VALUES
-(1,1),(1,2),(2,3),(3,1),(4,2),(5,4),(6,5),
-(7,1),(8,2),(9,3),(10,1),(11,4),(12,5),
-(13,2),(14,3),(15,1),(16,2),(17,4);
+(1,1),(1,2),(1,4),(1,5),(1,9),
+(2,3),(2,4),(2,6),(2,8),
+(3,1),(3,5),(3,7),
+(4,2),(4,5),
+(5,4),(5,8),(5,6),(6,5),(6,1),(6,2),(5,9),
+(7,1),(7,7),(8,2),(8,3),(8,4),(8,8),(8,9),
+(9,3),(9,5),(10,1),(10,4),(10,6),
+(11,4),(11,5),(11,8),(12,5),(12,2),(12,7),(12,9),
+(13,2),(13,6), (14,3),(14,4),(14,8),
+(15,1),(15,5),(15,9), (16,2),(16,4),(16,7),
+(17,4),(17,5),(17,8), (18,1),(18,3),(18,6),
+(19,2),(19,5), (20,3),(20,4),(20,8),(20,9),
+(21,1),(21,6), (22,4),(22,5),(22,7),
+(23,1),(23,2),(23,8), (24,3),(24,5),(24,6),
+(25,4),(25,7), (26,1),(26,2),(26,3),(26,4),(26,8),
+(27,2),(27,5), (28,1),(28,6),(28,7),
+(29,4),(29,5),(29,8), (30,2),(30,3),(30,6);
 
 INSERT INTO Sale VALUES
 (1,2,1,1,'2023-05-01',8000000,40),
@@ -381,6 +416,24 @@ BEGIN
     WHERE property_id = NEW.property_id;
 END$$
 
+CREATE TRIGGER trg_after_sale_delete
+AFTER DELETE ON Sale
+FOR EACH ROW
+BEGIN
+    UPDATE Property
+    SET status = 'available'
+    WHERE property_id = OLD.property_id;
+END$$
+
+CREATE TRIGGER trg_after_rent_delete
+AFTER DELETE ON Rental
+FOR EACH ROW
+BEGIN
+    UPDATE Property
+    SET status = 'available'
+    WHERE property_id = OLD.property_id;
+END$$
+
 DELIMITER ;
 
 -- Insert Default Admin
@@ -427,17 +480,18 @@ DELIMITER ;
 ALTER TABLE Property
 ADD address VARCHAR(100);
 
-UPDATE Property SET address='Karol Bagh', city_id = 1 WHERE property_id IN (1,10,19,28);
-UPDATE Property SET address='Lajpat Nagar', city_id = 1 WHERE property_id IN (4,13,22);
-UPDATE Property SET address='Dwarka', city_id = 1 WHERE property_id IN (7,16,25);
-UPDATE Property SET address='Rohini', city_id = 1 WHERE property_id IN (19);
+UPDATE Property SET address='Karol Bagh', city_id = 1 WHERE property_id IN (1,7,13,19,25);
+UPDATE Property SET address='Lajpat Nagar', city_id = 1 WHERE property_id IN (4);
+UPDATE Property SET address='Dwarka', city_id = 1 WHERE property_id IN (10,16);
 
-UPDATE Property SET address='Andheri', city_id = 2 WHERE property_id IN (2,11,20,29);
-UPDATE Property SET address='Bandra', city_id = 2 WHERE property_id IN (5,14,23);
-UPDATE Property SET address='Powai', city_id = 2 WHERE property_id IN (8,17,26);
-UPDATE Property SET address='Dadar', city_id = 2 WHERE property_id IN (14);
+UPDATE Property SET address='Andheri', city_id = 2 WHERE property_id IN (2,8,14,20,26);
 
 UPDATE Property SET address='Hinjewadi', city_id = 3 WHERE property_id IN (3,12,21,30);
 UPDATE Property SET address='Kothrud', city_id = 3 WHERE property_id IN (6,15,24);
 UPDATE Property SET address='Wakad', city_id = 3 WHERE property_id IN (9,18,27);
-UPDATE Property SET address='Baner', city_id = 3 WHERE property_id IN (15);
+
+UPDATE Property SET address='Kankarbagh', city_id = 4 WHERE property_id IN (5,16,22);
+UPDATE Property SET address='Boring Road', city_id = 4 WHERE property_id IN (10,28);
+
+UPDATE Property SET address='Dispur', city_id = 5 WHERE property_id IN (11,17,29);
+UPDATE Property SET address='AIDC', city_id = 5 WHERE property_id IN (6,23);

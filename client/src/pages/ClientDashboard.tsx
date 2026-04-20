@@ -9,6 +9,7 @@ export default function ClientDashboard() {
   
   const [user] = useState(() => JSON.parse(localStorage.getItem('user') || '{}'));
   const [view, setView] = useState(location.state?.isNew ? 'onboarding' : 'dashboard');
+  const [clientType, setClientType] = useState(user.type?.toLowerCase() || 'buyer');
   
   // Feedback Action States
   const [reviewForm, setReviewForm] = useState({ property_id: '', rating: 5, comment: '' });
@@ -48,8 +49,39 @@ export default function ClientDashboard() {
     }
   };
 
+  const handleReleaseAsset = async (propertyId: number) => {
+     try {
+         await api.delete(`/properties/${propertyId}/release`);
+         setActionMsg('Asset successfully released back to market.');
+         setTimeout(() => setActionMsg(''), 2000);
+         fetchDashboard();
+     } catch(err) {
+         alert("Failed to release asset.");
+     }
+  };
+
+  const handleCompleteSetup = async () => {
+    try {
+      const payload = {
+        name: user.name,
+        phone: user.phone,
+        email: user.email,
+        type: clientType
+      };
+      const res = await api.put('/auth/profile', payload);
+      // Synchronize updated user to local storage and refresh React state directly if possible
+      localStorage.setItem('user', JSON.stringify(res.data.user));
+      // Optionally update the local `user` reference if you mutate it, but since it's a snapshot, 
+      // the page will use the newly cached data if they refresh, or we can just proceed to dashboard
+    } catch(err) {
+      console.error('Failed to sync profile', err);
+    }
+    setView('dashboard');
+  };
+
   const navItems = [
-    { id: 'dashboard', name: 'Collector Dashboard' },
+    { id: 'dashboard', name: 'Client Dashboard' },
+    { id: 'inquiries', name: 'My Inquiries' },
     { id: 'search', name: 'Search & Discovery' },
     { id: 'transactions', name: 'My Transactions' },
     { id: 'reviews', name: 'My Reviews' }
@@ -66,17 +98,17 @@ export default function ClientDashboard() {
          </div>
          <div className="max-w-xl w-full bg-[#0a0a0c]/90 backdrop-blur-xl border border-[#10b981]/30 rounded-[32px] p-12 text-center relative z-10 shadow-[0_0_50px_rgba(16,185,129,0.15)]">
             <h1 className="text-3xl font-display font-bold mb-2">Welcome to Washub, {user.name.split(' ')[0]}</h1>
-            <p className="text-gray-400 mb-8 font-light">Let’s configure your Collector Preferences.</p>
+            <p className="text-gray-400 mb-8 font-light">Let’s configure your Client Preferences.</p>
             
             <div className="bg-[#131315] border border-[#222225] rounded-[16px] p-6 mb-8 text-left">
                <p className="text-[10px] tracking-[0.2em] font-bold uppercase text-gray-500 mb-4">Identity Confirmation</p>
                <div className="flex justify-between items-center mb-2">
-                 <span className="text-sm text-gray-400">Collector ID:</span>
+                 <span className="text-sm text-gray-400">Client ID:</span>
                  <span className="text-sm font-bold text-white">#WSH-{user.id || 'N/A'}</span>
                </div>
                <div className="flex justify-between items-center">
                  <span className="text-sm text-gray-400">Account Type:</span>
-                 <span className="text-sm font-bold text-[#10b981] uppercase tracking-widest">{user.type || 'Buyer'}</span>
+                 <span className="text-sm font-bold text-[#10b981] uppercase tracking-widest">{clientType}</span>
                </div>
             </div>
 
@@ -84,30 +116,30 @@ export default function ClientDashboard() {
                <p className="text-[10px] tracking-[0.2em] font-bold uppercase text-gray-500 mb-4 ml-1">Preference Setup</p>
 
                <div className="grid grid-cols-2 gap-4">
-                   <button className="bg-[#10b981] border border-[#047857] p-4 rounded-xl text-center shadow-lg">
-                      <span className="text-white text-sm font-bold block">Looking to Buy</span>
+                   <button onClick={() => setClientType('buyer')} className={`${clientType === 'buyer' ? 'bg-[#10b981] border border-[#047857] shadow-lg text-white' : 'bg-[#131315] border border-[#222225] hover:border-[#10b981] text-gray-400'} p-4 rounded-xl text-center transition-colors`}>
+                      <span className="text-sm font-bold block">Looking to Buy</span>
                    </button>
-                   <button className="bg-[#131315] border border-[#222225] hover:border-[#10b981] p-4 rounded-xl text-center transition-colors">
-                      <span className="text-gray-400 text-sm font-bold block">Looking to Rent</span>
+                   <button onClick={() => setClientType('renter')} className={`${clientType === 'renter' ? 'bg-[#10b981] border border-[#047857] shadow-lg text-white' : 'bg-[#131315] border border-[#222225] hover:border-[#10b981] text-gray-400'} p-4 rounded-xl text-center transition-colors`}>
+                      <span className="text-sm font-bold block">Looking to Rent</span>
                    </button>
                </div>
                
                <div className="bg-[#131315] border border-[#222225] p-4 rounded-xl flex items-center justify-between">
                   <span className="text-sm font-bold text-gray-300">Min Bedrooms</span>
-                  <select className="bg-transparent text-white outline-none font-bold">
-                      <option>Any</option><option>2+ BHK</option><option>3+ BHK</option><option>4+ BHK</option>
+                  <select className="bg-[#131315] text-white outline-none font-bold">
+                      <option className="bg-[#131315] text-white">Any</option><option className="bg-[#131315] text-white">2+ BHK</option><option className="bg-[#131315] text-white">3+ BHK</option><option className="bg-[#131315] text-white">4+ BHK</option>
                   </select>
                </div>
 
                <div className="bg-[#131315] border border-[#222225] p-4 rounded-xl flex items-center justify-between">
                   <span className="text-sm font-bold text-gray-300">Budget Range</span>
-                  <select className="bg-transparent text-white outline-none font-bold">
-                      <option>$1M - $3M</option><option>$3M - $5M</option><option>$5M+</option>
+                  <select className="bg-[#131315] text-white outline-none font-bold">
+                      <option className="bg-[#131315] text-white">$1M - $3M</option><option className="bg-[#131315] text-white">$3M - $5M</option><option className="bg-[#131315] text-white">$5M+</option>
                   </select>
                </div>
             </div>
 
-            <button onClick={() => setView('dashboard')} className="w-full bg-gradient-to-r from-[#10b981] to-[#047857] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] transition-all">
+            <button onClick={handleCompleteSetup} className="w-full bg-gradient-to-r from-[#10b981] to-[#047857] text-white py-4 rounded-xl font-bold uppercase tracking-widest text-[11px] shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:scale-[1.02] transition-all">
                Complete Setup & Enter Dashboard
             </button>
          </div>
@@ -127,7 +159,7 @@ export default function ClientDashboard() {
                {user.name ? user.name[0] : 'C'}
             </div>
             <div>
-              <p className="text-white text-[13px] font-bold">{user.name || 'Collector'}</p>
+              <p className="text-white text-[13px] font-bold">{user.name || 'Client'}</p>
               <p className="text-gray-500 text-[9px] uppercase tracking-wider">{user.type || 'Buyer'}</p>
             </div>
           </div>
@@ -162,7 +194,7 @@ export default function ClientDashboard() {
         <div className="flex justify-between items-start mb-10">
           <div>
             <p className="text-[10px] tracking-[0.2em] font-bold text-[#10b981] uppercase mb-2">Discovery Hub</p>
-            <h1 className="text-4xl font-display font-bold mb-2">Collector Dashboard.</h1>
+            <h1 className="text-4xl font-display font-bold mb-2">Client Dashboard.</h1>
           </div>
           {actionMsg && <div className="px-6 py-2 bg-green-500/20 text-green-400 border border-green-500/30 rounded-full text-xs font-bold font-display animate-pulse">{actionMsg}</div>}
         </div>
@@ -218,6 +250,31 @@ export default function ClientDashboard() {
            </div>
         )}
 
+        {view === 'inquiries' && (
+           <div className="bg-[#0a0a0c] border border-[#222225] rounded-[32px] p-8">
+               <h2 className="text-2xl font-display font-bold mb-8 flex items-center gap-2">My Active Inquiries<span className="text-[#10b981]">.</span></h2>
+               <div className="space-y-4">
+                  {data?.inquiries?.map((inq:any) => (
+                      <div key={inq.inquiry_id} className="bg-[#131315] border border-[#222225] p-5 rounded-2xl flex justify-between items-center group hover:border-[#10b981]/30 transition-colors">
+                          <div className="flex-1">
+                              <p className="font-bold text-white text-sm mb-1">Inquiry: Property #{inq.property_id} ({inq.city_name})</p>
+                              <p className="text-[11px] text-gray-400 mb-2">Message: "{inq.message}"</p>
+                              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Assigned Agent: {inq.agent_name}</p>
+                          </div>
+                          <div className="ml-6 text-right">
+                              <span className={`px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-full ${inq.status === 'accepted' ? 'bg-[#10b981]/10 text-[#34d399] border border-[#10b981]/20' : inq.status === 'rejected' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'}`}>
+                                 {inq.status}
+                              </span>
+                          </div>
+                      </div>
+                  ))}
+                  {(!data?.inquiries || data?.inquiries?.length === 0) && (
+                     <div className="p-10 border border-[#222225] rounded-3xl text-center text-gray-600 font-bold tracking-widest text-[10px] uppercase">No Inquiries Found</div>
+                  )}
+               </div>
+           </div>
+        )}
+
         {view === 'transactions' && (
            <div className="bg-[#0a0a0c] border border-[#222225] rounded-[32px] p-8">
                <h2 className="text-2xl font-display font-bold mb-8 flex items-center gap-2">My Transactions<span className="text-[#10b981]">.</span></h2>
@@ -228,7 +285,10 @@ export default function ClientDashboard() {
                               <p className="font-bold text-white text-sm mb-1">Asset Deployed - Purchase</p>
                               <p className="text-[11px] text-gray-400">Washub Property #{t.property_id} • Amount: {formatCurrency(t.price)}</p>
                           </div>
-                          <span className="px-4 py-1.5 bg-[#10b981]/10 text-[#34d399] border border-[#10b981]/20 text-[9px] font-bold uppercase tracking-widest rounded-full">Sale Validated</span>
+                          <div className="flex gap-4 items-center">
+                              <span className="px-4 py-1.5 bg-[#10b981]/10 text-[#34d399] border border-[#10b981]/20 text-[9px] font-bold uppercase tracking-widest rounded-full">Sale Validated</span>
+                              <span className="px-4 py-1.5 border border-[#222225] bg-[#131315] text-gray-500 text-[9px] font-bold uppercase tracking-widest rounded-full">Permanently Acquired</span>
+                          </div>
                       </div>
                   ))}
                   {data?.rentals?.map((t:any) => (
@@ -237,7 +297,16 @@ export default function ClientDashboard() {
                               <p className="font-bold text-white text-sm mb-1">Asset Deployed - Lease</p>
                               <p className="text-[11px] text-gray-400">Washub Property #{t.property_id} • Amount: {formatCurrency(t.rent_amount)} / mo</p>
                           </div>
-                          <span className="px-4 py-1.5 bg-[#3b82f6]/10 text-[#60a5fa] border border-[#3b82f6]/20 text-[9px] font-bold uppercase tracking-widest rounded-full">Lease Active</span>
+                          <div className="flex gap-4 items-center">
+                              {new Date(t.end_date) <= new Date() ? (
+                                   <span className="px-4 py-1.5 bg-[#131315] border border-[#222225] text-gray-400 text-[9px] font-bold uppercase tracking-widest rounded-full">Lease Concluded</span>
+                               ) : (
+                                   <>
+                                      <span className="px-4 py-1.5 bg-[#3b82f6]/10 text-[#60a5fa] border border-[#3b82f6]/20 text-[9px] font-bold uppercase tracking-widest rounded-full">Lease Active</span>
+                                      <button onClick={() => handleReleaseAsset(t.property_id)} className="px-4 py-1.5 bg-red-500/10 hover:bg-red-500 hover:text-white border border-red-500/30 text-red-500 text-[9px] font-bold uppercase tracking-widest rounded-full transition-colors cursor-pointer relative z-10">Terminate Lease</button>
+                                   </>
+                               )}
+                          </div>
                       </div>
                   ))}
                   {(!data?.purchases?.length && !data?.rentals?.length) && (
@@ -257,7 +326,7 @@ export default function ClientDashboard() {
                       <input type="text" value={reviewForm.property_id} onChange={(e) => setReviewForm({...reviewForm, property_id: e.target.value})} className="w-full bg-[#050505] border border-[#222225] text-white px-4 py-3 rounded-xl outline-none focus:border-[#10b981] transition-colors" placeholder="e.g. 15"/>
                    </div>
                    <div className="flex-[2]">
-                      <label className="text-[9px] uppercase tracking-widest font-bold text-gray-500 mb-2 block ml-1">Curator Comment</label>
+                      <label className="text-[9px] uppercase tracking-widest font-bold text-gray-500 mb-2 block ml-1">Client Comment</label>
                       <input type="text" value={reviewForm.comment} onChange={(e) => setReviewForm({...reviewForm, comment: e.target.value})} className="w-full bg-[#050505] border border-[#222225] text-white px-4 py-3 rounded-xl outline-none focus:border-[#10b981] transition-colors" placeholder="Exquisite brutalist geometry..."/>
                    </div>
                    <button type="submit" className="bg-[#10b981] text-white font-bold uppercase tracking-widest text-[10px] px-8 py-4 rounded-xl hover:bg-[#047857] transition-all">Post Review</button>

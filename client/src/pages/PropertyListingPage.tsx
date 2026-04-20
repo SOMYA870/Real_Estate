@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 
@@ -9,19 +9,48 @@ export default function PropertyListingPage() {
   const [loading, setLoading] = useState(true);
 
   // Filters State matching mockup styles
-  const [styleFilter, setStyleFilter] = useState('');
+  const [cities, setCities] = useState<any[]>([]);
+  const [types, setTypes] = useState<any[]>([]);
+  const [amenities, setAmenities] = useState<any[]>([]);
+
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+
   const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'price-desc', 'price-asc'
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
   useEffect(() => {
     fetchProperties();
+    fetchReferences();
   }, []);
+
+  const fetchReferences = async () => {
+    try {
+       const [cRes, tRes, aRes] = await Promise.all([
+          api.get('/references/cities'),
+          api.get('/references/types'),
+          api.get('/references/amenities')
+       ]);
+       setCities(cRes.data);
+       setTypes(tRes.data);
+       setAmenities(aRes.data);
+    } catch(err) {
+       console.error("References Load:", err);
+    }
+  };
 
   const fetchProperties = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/properties');
+      let queryParams = [];
+      if(selectedCity) queryParams.push(`city_id=${selectedCity}`);
+      if(selectedType) queryParams.push(`type_id=${selectedType}`);
+      if(selectedAmenities.length > 0) queryParams.push(`amenities=${selectedAmenities.join(',')}`);
+      
+      const q = queryParams.length ? '?' + queryParams.join('&') : '';
+      const res = await api.get(`/properties${q}`);
       setProperties(res.data.data || []);
     } catch (err) {
       console.error(err);
@@ -38,11 +67,9 @@ export default function PropertyListingPage() {
   const filteredProperties = useMemo(() => {
     let result = [...properties];
     const locQ = searchParams.get('location')?.toLowerCase() || '';
-    const typeQ = searchParams.get('type')?.toLowerCase() || '';
 
     // Search filters
     if (locQ) result = result.filter((p: any) => p.city_name?.toLowerCase().includes(locQ));
-    if (typeQ) result = result.filter((p: any) => p.type_name?.toLowerCase().includes(typeQ));
 
     // Sort
     if (sortOrder === 'price-desc') result.sort((a: any, b: any) => (b.selling_price || b.rent_price || 0) - (a.selling_price || a.rent_price || 0));
@@ -61,12 +88,9 @@ export default function PropertyListingPage() {
       <nav className="w-full h-24 flex items-center justify-between px-16 border-b border-[#222225] bg-[#050505] sticky top-0 z-50">
           <h2 className="text-white font-display font-bold tracking-widest text-lg cursor-pointer hover:text-[#a855f7] transition-all" onClick={() => navigate('/')}>WASHUB</h2>
           <div className="hidden md:flex gap-12 font-medium text-[11px] tracking-widest uppercase text-gray-400">
-              <span className="text-white cursor-pointer hover:text-arch-purple transition-colors">Curated</span>
-              <span className="cursor-pointer hover:text-white transition-colors">Agents</span>
-              <span className="cursor-pointer hover:text-white transition-colors">Contact</span>
+              <span className="text-white cursor-pointer hover:text-arch-purple transition-colors">Curated Properties</span>
           </div>
           <div className="flex items-center gap-8">
-              <svg className="w-5 h-5 text-gray-400 hover:text-white cursor-pointer transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               <div className="w-10 h-10 rounded-full border border-[#222225] flex items-center justify-center hover:bg-[#131315] cursor-pointer transition-colors" onClick={() => navigate('/login')}>
                   <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               </div>
@@ -79,28 +103,24 @@ export default function PropertyListingPage() {
               <h3 className="text-[10px] tracking-[0.2em] font-bold text-arch-purple uppercase mb-10">Refine Collection</h3>
 
               <div className="mb-12">
-                  <p className="text-[13px] font-medium text-white mb-6">Investment Range</p>
-                  <div className="h-1 bg-[#222225] rounded-full relative mb-4">
-                      {/* Mock Range Selected */}
-                      <div className="absolute top-0 left-[10%] right-[30%] bg-[#a855f7] h-full rounded-full"></div>
-                      <div className="absolute top-1/2 -translate-y-1/2 left-[10%] w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_10px_#a855f7]"></div>
-                      <div className="absolute top-1/2 -translate-y-1/2 left-[70%] w-3.5 h-3.5 rounded-full bg-white shadow-[0_0_10px_#a855f7]"></div>
-                  </div>
-                  <div className="flex justify-between text-[10px] font-bold tracking-widest text-gray-500 uppercase">
-                      <span>$2.5M</span>
-                      <span>$15.0M+</span>
+                  <p className="text-[13px] font-medium text-white mb-6">Location (City)</p>
+                  <div className="space-y-4">
+                      <select className="w-full bg-[#131315] border border-[#222225] text-white p-3 rounded-xl outline-none text-sm cursor-pointer hover:border-[#a855f7]/50 transition-colors appearance-none" value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)}>
+                         <option value="">Global Network (All)</option>
+                         {cities.map(c => <option key={c.city_id} value={c.city_id}>{c.city_name}</option>)}
+                      </select>
                   </div>
               </div>
 
               <div className="mb-12">
-                  <p className="text-[13px] font-medium text-white mb-6">Architectural Style</p>
+                  <p className="text-[13px] font-medium text-white mb-6">Property Type</p>
                   <div className="space-y-5">
-                      {['Brutalist Modern', 'Glass Pavilions', 'Minimalist Lofts'].map(style => (
-                          <div key={style} className="flex items-center gap-4 cursor-pointer" onClick={() => setStyleFilter(style)}>
-                              <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${styleFilter === style || style === 'Glass Pavilions' ? 'border-[#a855f7] bg-[#a855f7]/20' : 'border-[#222225] bg-[#0a0a0c]'}`}>
-                                  {(styleFilter === style || style === 'Glass Pavilions') && <span className="w-2.5 h-2.5 rounded-full bg-[#a855f7]"></span>}
+                      {types.map(t => (
+                          <div key={t.type_id} className="flex items-center gap-4 cursor-pointer group" onClick={() => setSelectedType(selectedType === String(t.type_id) ? '' : String(t.type_id))}>
+                              <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${selectedType === String(t.type_id) ? 'border-[#a855f7] bg-[#a855f7]/20 relative' : 'border-[#222225] bg-[#0a0a0c] group-hover:border-gray-500'}`}>
+                                  {selectedType === String(t.type_id) && <span className="absolute inset-0 m-auto w-2 h-2 rounded-full bg-[#a855f7]"></span>}
                               </div>
-                              <span className="text-[12px] text-gray-300 font-medium">{style}</span>
+                              <span className={`text-[12px] font-medium ${selectedType === String(t.type_id) ? 'text-white' : 'text-gray-400 group-hover:text-gray-300'}`}>{t.type_name}</span>
                           </div>
                       ))}
                   </div>
@@ -109,11 +129,14 @@ export default function PropertyListingPage() {
               <div className="mb-12">
                   <p className="text-[13px] font-medium text-white mb-6">Curated Amenities</p>
                   <div className="flex flex-wrap gap-3">
-                      {['Infinity Pool', 'Private Gallery', 'Wine Vault', 'Heli-pad'].map(am => (
-                          <button key={am} className={`px-5 py-2.5 rounded-full border text-[11px] transition-colors ${am === 'Private Gallery' ? 'border-[#a855f7] text-[#a855f7] bg-[#a855f7]/10' : 'border-[#222225] text-gray-400 hover:text-white'}`}>
-                              {am}
+                      {amenities.map(am => {
+                          const isSelected = selectedAmenities.includes(String(am.amenity_id));
+                          return (
+                          <button key={am.amenity_id} onClick={() => setSelectedAmenities(prev => isSelected ? prev.filter(x => x !== String(am.amenity_id)) : [...prev, String(am.amenity_id)])} className={`px-5 py-2.5 rounded-full border text-[11px] transition-colors cursor-pointer ${isSelected ? 'border-[#a855f7] text-[#d8b4fe] bg-[#a855f7]/20 shadow-[0_0_15px_rgba(168,85,247,0.2)]' : 'border-[#222225] text-gray-500 hover:text-gray-300 hover:bg-white/5 bg-[#0a0a0c]'}`}>
+                              {am.amenity_name}
                           </button>
-                      ))}
+                          );
+                      })}
                   </div>
               </div>
 
@@ -170,13 +193,17 @@ export default function PropertyListingPage() {
 
                               {/* Content at bottom */}
                               <div className="absolute bottom-0 left-0 right-0 p-8 z-10 flex flex-col justify-end h-full">
-                                  <h2 className="text-3xl font-display font-medium text-white mb-2 shadow-black/50 drop-shadow-md">{formatCurrency(prop.selling_price || prop.rent_price)}</h2>
+                                  <div className="mb-2 space-y-1">
+                                      {prop.selling_price > 0 && <h2 className="text-2xl font-display font-medium text-white shadow-black/50 drop-shadow-md"><span className="text-[12px] font-bold uppercase tracking-widest text-[#a855f7] mr-2">Sale</span>{formatCurrency(prop.selling_price)}</h2>}
+                                      {prop.rent_price > 0 && <h2 className="text-2xl font-display font-medium text-white shadow-black/50 drop-shadow-md"><span className="text-[12px] font-bold uppercase tracking-widest text-[#10b981] mr-2">Rent</span>{formatCurrency(prop.rent_price)} <span className="text-[14px]">/ mo</span></h2>}
+                                      {!prop.selling_price && !prop.rent_price && <h2 className="text-2xl font-display font-medium text-white shadow-black/50 drop-shadow-md">Price on Request</h2>}
+                                  </div>
                                   <h3 className="text-2xl font-display font-bold text-white mb-2 shadow-black/50 drop-shadow-md">The {prop.city_name} {prop.type_name}</h3>
                                   
                                   <div className="flex justify-between items-end mb-6">
-                                      <p className="text-[12px] text-gray-300 flex items-center gap-2">
-                                          <svg className="w-3 h-3 text-[#a855f7]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                          {prop.city_name}, Global
+                                      <p className="text-[11px] text-gray-300 flex items-center gap-2 max-w-[60%] leading-relaxed truncate">
+                                          <svg className="w-3 h-3 text-[#a855f7] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                          <span className="truncate">{prop.address ? prop.address + ', ' : ''}{prop.city_name}</span>
                                       </p>
                                       <div className="flex gap-4 text-right">
                                           <div>

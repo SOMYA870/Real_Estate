@@ -25,7 +25,13 @@ export default function LoginRegisterPage() {
     try {
       if (isLogin) {
         // LOGIN
-        const res = await api.post('/auth/login', { identifier: formData.identifier, password: formData.password });
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.identifier);
+        const isPhone = /^\d{10}$/.test(formData.identifier);
+        if (!isEmail && !isPhone) {
+          setError('Identifier must be a valid email or exactly a 10-digit phone number');
+          return;
+        }
+        const res = await api.post('/auth/login', { identifier: formData.identifier, password: formData.password, expectedRole: formData.role });
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         
@@ -37,6 +43,16 @@ export default function LoginRegisterPage() {
         else navigate('/properties');
       } else {
         // REGISTER
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|mail\.com|yahoo\.com)$/i;
+        if (!emailRegex.test(formData.email)) {
+           setError('Please use a valid @gmail.com, @mail.com, or @yahoo.com email address');
+           return;
+        }
+        if (formData.phone.length !== 10) {
+           setError('Phone number must be exactly 10 digits');
+           return;
+        }
+
         const payload: any = {
            name: formData.name,
            email: formData.email,
@@ -51,7 +67,7 @@ export default function LoginRegisterPage() {
         await api.post('/auth/register', payload);
         
         // Auto-login after register
-        const res = await api.post('/auth/login', { identifier: formData.email || formData.phone, password: formData.password });
+        const res = await api.post('/auth/login', { identifier: formData.email || formData.phone, password: formData.password, expectedRole: formData.role });
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
         
@@ -121,16 +137,16 @@ export default function LoginRegisterPage() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               
-              {/* Triple-Tab Role Switcher */}
-              <div className="flex bg-[#050505] border border-[#222225] rounded-[16px] p-1 mb-8">
-                 {(isLogin ? ['client', 'agent', 'admin'] : ['client', 'agent']).map(tab => (
+              {/* Core Role Switcher */}
+              <div className="flex bg-[#050505] border border-[#222225] rounded-[16px] p-1 mb-8 overflow-x-auto scroller-hidden">
+                 {(isLogin ? ['client', 'agent', 'owner', 'admin'] : ['client', 'agent', 'owner']).map(tab => (
                     <button 
                        key={tab}
                        type="button"
                        onClick={() => setFormData({...formData, role: tab})}
-                       className={`flex-1 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] rounded-[12px] transition-all ${formData.role === tab ? 'bg-[#9333ea] text-white shadow-[0_0_15px_rgba(147,51,234,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
+                       className={`min-w-[80px] flex-1 py-2.5 text-[10px] font-bold uppercase tracking-[0.2em] rounded-[12px] transition-all ${formData.role === tab ? 'bg-[#9333ea] text-white shadow-[0_0_15px_rgba(147,51,234,0.3)]' : 'text-gray-500 hover:text-gray-300'}`}
                     >
-                       {tab === 'client' ? 'Collector' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                       {tab === 'client' ? 'Client' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                     </button>
                  ))}
               </div>
@@ -142,8 +158,8 @@ export default function LoginRegisterPage() {
                        <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full bg-[#050505] border border-[#222225] rounded-[16px] px-5 py-3 text-white focus:border-arch-purple focus:outline-none transition-all text-sm" placeholder="John Doe" required={!isLogin} />
                     </div>
                     <div className="space-y-2">
-                       <label className="text-[9px] tracking-[0.2em] text-gray-400 font-bold uppercase ml-1 block">Phone</label>
-                       <input type="text" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} className="w-full bg-[#050505] border border-[#222225] rounded-[16px] px-5 py-3 text-white focus:border-arch-purple focus:outline-none transition-all text-sm" placeholder="+12345678" required={!isLogin} />
+                       <label className="text-[9px] tracking-[0.2em] text-gray-400 font-bold uppercase ml-1 block">Phone (10 Digits)</label>
+                       <input type="text" maxLength={10} value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} className="w-full bg-[#050505] border border-[#222225] rounded-[16px] px-5 py-3 text-white focus:border-arch-purple focus:outline-none transition-all text-sm" placeholder="9876543210" required={!isLogin} />
                     </div>
                  </>
               )}
@@ -151,11 +167,11 @@ export default function LoginRegisterPage() {
               <div className="space-y-2">
                 <label className="text-[9px] tracking-[0.2em] text-gray-400 font-bold uppercase ml-1 block">Email Address {isLogin && '/ Phone'}</label>
                 <input 
-                  type="text" 
+                  type={isLogin ? "text" : "email"} 
                   value={isLogin ? formData.identifier : formData.email}
                   onChange={(e) => isLogin ? setFormData({...formData, identifier: e.target.value}) : setFormData({...formData, email: e.target.value})}
                   className="w-full bg-[#050505] border border-[#222225] rounded-[16px] px-5 py-3 text-white placeholder-gray-600 focus:border-arch-purple focus:outline-none transition-all text-sm"
-                  placeholder={isLogin ? "name@curation.com or Phone" : "name@curation.com"}
+                  placeholder={isLogin ? "name@curation.com or Phone" : "name@gmail.com"}
                   required 
                 />
               </div>

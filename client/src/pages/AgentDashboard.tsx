@@ -12,6 +12,8 @@ export default function AgentDashboard() {
   
   // Modals & States
   const [actionMsg, setActionMsg] = useState('');
+  const [showAddProperty, setShowAddProperty] = useState(false);
+  const [propForm, setPropForm] = useState({ city_id: 1, type_id: 1, size: 1000, bedrooms: 2, bathrooms: 2, year_of_construction: 2020, selling_price: 0, rent_price: 0, owner_id: 1, address: '' });
 
   const fetchDashboard = async () => {
     try {
@@ -44,8 +46,34 @@ export default function AgentDashboard() {
     }
   };
 
+  const handleAddProperty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if(!propForm.selling_price && !propForm.rent_price) return alert("Please specify either selling or rent price.");
+      await api.post('/properties', { ...propForm, agent_id: user.id });
+      setShowAddProperty(false);
+      fetchDashboard();
+      setActionMsg('Property Added Securely');
+      setTimeout(() => setActionMsg(''), 2000);
+    } catch(err: any) {
+      alert("Failed to add property: " + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const handleInquiryStatus = async (inquiryId: number, status: string) => {
+     try {
+         await api.put(`/dashboards/agent/inquiries/${inquiryId}`, { status });
+         fetchDashboard();
+         setActionMsg(`Inquiry ${status}`);
+         setTimeout(() => setActionMsg(''), 2000);
+     } catch(err: any) {
+         alert("Failed to resolve inquiry");
+     }
+  };
+
   const navItems = [
     { id: 'dashboard', name: 'Dashboard' },
+    { id: 'inquiries', name: 'Client Inquiries' },
     { id: 'properties', name: 'Property Management' },
     { id: 'transactions', name: 'Transaction Logs' },
     { id: 'reviews', name: 'Client Reviews' },
@@ -134,9 +162,6 @@ export default function AgentDashboard() {
         </div>
         
         <div className="space-y-2">
-            <button onClick={() => setShowProfile(true)} className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-bold text-[13px] text-gray-500 hover:text-white hover:bg-[#131315]">
-                Settings
-            </button>
              <button onClick={handleLogout} className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all font-bold text-[13px] text-red-500 hover:text-white hover:bg-[#131315]">
                 Sign Out
             </button>
@@ -194,7 +219,7 @@ export default function AgentDashboard() {
            <div className="bg-[#0a0a0c] border border-[#222225] rounded-[32px] p-8">
                <div className="flex justify-between items-center mb-8">
                    <h2 className="text-2xl font-display font-bold">Property Management (CRUD)</h2>
-                   <button onClick={() => alert("Add Property Modal would open here.")} className="bg-[#9333ea] px-6 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[10px] text-white hover:bg-[#7e22ce] transition-colors shadow-lg shadow-purple-900/30">Add Property</button>
+                   <button onClick={() => setShowAddProperty(true)} className="bg-[#9333ea] px-6 py-2.5 rounded-xl font-bold uppercase tracking-widest text-[10px] text-white hover:bg-[#7e22ce] transition-colors shadow-lg shadow-purple-900/30">+ Add Property</button>
                </div>
                
                <div className="overflow-x-auto">
@@ -223,6 +248,35 @@ export default function AgentDashboard() {
                            ))}
                        </tbody>
                    </table>
+               </div>
+           </div>
+        )}
+
+        {view === 'inquiries' && (
+           <div className="bg-[#0a0a0c] border border-[#222225] rounded-[32px] p-8">
+               <h2 className="text-2xl font-display font-bold mb-8">Client Inquiries</h2>
+               <div className="space-y-4">
+                  {data?.inquiries?.map((inq:any) => (
+                      <div key={inq.inquiry_id} className="bg-[#131315] border border-[#222225] p-6 rounded-2xl flex justify-between items-center group hover:border-[#a855f7]/30 transition-colors">
+                          <div className="flex-1">
+                              <p className="font-bold text-white text-sm mb-1">{inq.client_name} <span className="text-gray-500 font-normal ml-2">({inq.client_phone})</span></p>
+                              <p className="text-[12px] text-gray-300 italic mb-2">"{inq.message}"</p>
+                              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Target: Property #{inq.property_id} (City #{inq.city_id})</p>
+                          </div>
+                          <div className="flex flex-col gap-2 ml-6 text-right items-end">
+                              <span className={`px-4 py-1 text-[9px] font-bold uppercase tracking-widest rounded-full ${inq.status === 'accepted' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : inq.status === 'rejected' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'}`}>{inq.status}</span>
+                              {inq.status === 'pending' && (
+                                <div className="flex gap-2 mt-2">
+                                  <button onClick={() => handleInquiryStatus(inq.inquiry_id, 'accepted')} className="px-3 py-1 bg-[#a855f7] hover:bg-[#7e22ce] text-white text-[10px] rounded cursor-pointer transition-colors font-bold uppercase">Accept</button>
+                                  <button onClick={() => handleInquiryStatus(inq.inquiry_id, 'rejected')} className="px-3 py-1 bg-[#222225] hover:bg-[#333336] text-white text-[10px] rounded cursor-pointer transition-colors font-bold uppercase">Reject</button>
+                                </div>
+                              )}
+                          </div>
+                      </div>
+                  ))}
+                  {(!data?.inquiries || data?.inquiries?.length === 0) && (
+                     <div className="p-8 text-center border border-[#222225] rounded-[24px] text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">No Pending Inquiries</div>
+                  )}
                </div>
            </div>
         )}
@@ -282,6 +336,67 @@ export default function AgentDashboard() {
         )}
 
       </div>
+
+      {showAddProperty && (
+        <div className="fixed inset-0 bg-[#050505]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+           <div className="bg-[#0a0a0c] border border-[#222225] p-8 rounded-[32px] w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+               <h2 className="text-2xl font-display font-bold mb-6">Register New Property</h2>
+               <form onSubmit={handleAddProperty} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="col-span-2">
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Complete Address</label>
+                          <input type="text" required placeholder="Street address or locality..." className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.address} onChange={(e) => setPropForm({...propForm, address: e.target.value})}/>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">City</label>
+                          <select className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.city_id} onChange={(e) => setPropForm({...propForm, city_id: Number(e.target.value)})}>
+                             <option value={1}>Delhi</option><option value={2}>Mumbai</option><option value={3}>Pune</option>
+                          </select>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Property Type</label>
+                          <select className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.type_id} onChange={(e) => setPropForm({...propForm, type_id: Number(e.target.value)})}>
+                             <option value={1}>Flat</option><option value={2}>House</option>
+                          </select>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Size (sqft)</label>
+                          <input type="number" required className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.size} onChange={(e) => setPropForm({...propForm, size: Number(e.target.value)})}/>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Year Constructed</label>
+                          <input type="number" required className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.year_of_construction} onChange={(e) => setPropForm({...propForm, year_of_construction: Number(e.target.value)})}/>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Bedrooms</label>
+                          <input type="number" required className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.bedrooms} onChange={(e) => setPropForm({...propForm, bedrooms: Number(e.target.value)})}/>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Bathrooms</label>
+                          <input type="number" required className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.bathrooms} onChange={(e) => setPropForm({...propForm, bathrooms: Number(e.target.value)})}/>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Selling Price ($)</label>
+                          <input type="number" className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.selling_price} onChange={(e) => setPropForm({...propForm, selling_price: Number(e.target.value)})}/>
+                      </div>
+                      <div>
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Rent Price ($)</label>
+                          <input type="number" className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.rent_price} onChange={(e) => setPropForm({...propForm, rent_price: Number(e.target.value)})}/>
+                      </div>
+                      <div className="col-span-2">
+                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2">Owner ID Reference (Database Link)</label>
+                          <input type="number" required className="bg-[#131315] border border-[#222225] w-full p-3 rounded-xl text-white outline-none" value={propForm.owner_id} onChange={(e) => setPropForm({...propForm, owner_id: Number(e.target.value)})}/>
+                      </div>
+                  </div>
+                  <div className="flex gap-4 mt-8 pt-4 border-t border-[#222225]">
+                      <button type="button" onClick={() => setShowAddProperty(false)} className="px-6 py-3 rounded-xl bg-[#131315] hover:bg-[#222225] transition-colors font-bold text-sm">Cancel</button>
+                      <button type="submit" className="flex-1 bg-[#a855f7] hover:bg-[#7e22ce] transition-colors text-white rounded-xl font-bold uppercase tracking-widest text-sm shadow-[0_0_20px_rgba(168,85,247,0.3)]">List Property Securely</button>
+                  </div>
+               </form>
+           </div>
+        </div>
+      )}
+
     </div>
   );
 }

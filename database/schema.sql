@@ -291,7 +291,7 @@ INSERT INTO Client (client_id, name, phone, type) VALUES
 (50,'Zaid Ansari','8000000050','renter');
 
 
-INSERT INTO Property (property_id, city_id, type_id, size, bedrooms, bathrooms, year_of_construction, selling_price, rent_price, status, owner_id, listed_on) VALUES
+INSERT INTO Property VALUES
 (1,1,1,1200,3,2,2015,5000000,20000,'available',1,'2023-01-01'),
 (2,2,2,2000,4,3,2018,8000000,30000,'sold',1,'2023-02-01'),
 (3,3,1,1000,2,2,2017,4000000,15000,'rent',2,'2023-03-01'),
